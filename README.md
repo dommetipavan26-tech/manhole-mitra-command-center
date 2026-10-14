@@ -129,11 +129,3 @@ The backend will poll V0, V1, V2, V5 and V6 every five seconds using Blynk HTTPS
 The website does not expose the Blynk token. It sends V10 reset through the backend only after the presenter enters `CONTROL_KEY`.
 
 The ESP32 remains the final authority: the firmware rejects reset if the reed/tilt inputs still indicate an unsafe cover.
-
-## Deploy to Render
-
-A `render.yaml` blueprint is included. See `DEPLOYMENT.md` for exact GitHub and Render instructions.
-
-## Safety scope
-
-This is a controlled academic prototype. It is not certified for road, sewer, public infrastructure, explosion-prone, or life-safety deployment.

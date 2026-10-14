@@ -1,0 +1,25 @@
+services:
+  - type: web
+    name: manhole-mitra-command-center
+    runtime: node
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_VERSION
+        value: 20.20.2
+      - key: WEBHOOK_SECRET
+        sync: false
+      - key: CONTROL_KEY
+        sync: false
+      - key: BLYNK_SERVER
+        value: https://blr1.blynk.cloud
+      - key: BLYNK_DEVICE_TOKEN
+        sync: false
+      - key: POLL_BLYNK
+        value: false
+      - key: POLL_INTERVAL_MS
+        value: "5000"
+      - key: DEMO_MODE
+        value: true

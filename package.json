@@ -1,0 +1,15 @@
+{
+  "name": "manhole-mitra-command-center",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Secure custom real-time dashboard for the ESP32 Manhole-Mitra prototype using Blynk as an IoT backend.",
+  "main": "server.js",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js",
+    "check": "node --check server.js"
+  }
+}

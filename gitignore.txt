@@ -1,0 +1,16 @@
+# Secrets / deployment configuration
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+*.token
+
+# Node
+node_modules/
+npm-debug.log*
+
+# Operating system / editor
+.DS_Store
+.vscode/
+.idea/

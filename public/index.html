@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#0d2336" />
+  <title>Manhole-Mitra | Safety Command Center</title>
+  <meta name="description" content="A custom real-time command center for the Manhole-Mitra ESP32 safety node." />
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <div class="ambient ambient-one"></div><div class="ambient ambient-two"></div>
+  <aside class="rail" aria-label="Application navigation">
+    <div class="monogram">MM</div>
+    <div class="rail-line"></div>
+    <button class="rail-button is-active" aria-label="Overview"><span></span></button>
+    <button class="rail-button" aria-label="System architecture"><span></span></button>
+    <button class="rail-button" aria-label="Events"><span></span></button>
+    <div class="rail-bottom">ESP32<br>IoT</div>
+  </aside>
+
+  <main class="app-shell">
+    <header class="topbar">
+      <div class="headline-block">
+        <p class="eyebrow">INTERNAL WATER-LEVEL & COVER SAFETY</p>
+        <h1>Manhole-Mitra <span>Command Center</span></h1>
+        <p class="subhead">A custom monitoring interface for the ESP32 safety node.</p>
+      </div>
+      <div class="connection-glass">
+        <div id="live-dot" class="live-dot"></div>
+        <div><strong id="connection-label">CONNECTING</strong><small id="last-updated">Waiting for telemetry</small></div>
+      </div>
+    </header>
+
+    <section class="identity-ribbon glass-panel">
+      <div class="node-chip"><span class="node-icon">◇</span><div><small>MONITORED NODE</small><b id="device-name">MM 001 College Main Gate</b></div></div>
+      <div class="signal-flow"><span>UNDER-COVER PROBE</span><i></i><span>LOCAL SAFETY LOGIC</span><i></i><span>LIVE BLYNK DATA</span></div>
+      <div id="source-badge" class="source-badge">DEMO PREVIEW</div>
+    </section>
+
+    <section class="summary-grid">
+      <article class="summary-copy glass-panel">
+        <p class="eyebrow">PROJECT SUMMARY</p>
+        <h2>One node. Two protective functions.</h2>
+        <p>Manhole-Mitra detects a missing or tilted cover, then monitors the water level inside the manhole chamber. Local LED/buzzer output is immediate; Blynk provides the remote event and status layer.</p>
+        <div class="summary-tags"><span>Reed + Tilt</span><span>AJ-SR04M + Float</span><span>ESP32 + Blynk</span></div>
+      </article>
+      <article class="summary-logic glass-panel">
+        <p class="eyebrow">MEASUREMENT MODEL</p>
+        <div class="formula">Internal water depth <b>=</b> probe-to-base height <b>−</b> probe-to-water gap</div>
+        <p>Internal water level is an early hydraulic-risk indicator. Reed and tilt sensors remain the direct confirmation of cover displacement.</p>
+      </article>
+    </section>
+
+    <section class="status-grid">
+      <article id="cover-card" class="status-card is-normal">
+        <div class="card-top"><span>V1 · COVER STATUS</span><i></i></div>
+        <div id="cover-status" class="status-label">COVER OK</div>
+        <p id="cover-desc">Reed and tilt inputs are safe.</p>
+      </article>
+      <article id="risk-card" class="status-card is-normal">
+        <div class="card-top"><span>V5 · INTERNAL WATER RISK</span><i></i></div>
+        <div id="risk-status" class="status-label">NORMAL</div>
+        <p id="risk-desc">Internal chamber condition is stable.</p>
+      </article>
+      <article class="metric-card glass-panel">
+        <p class="eyebrow">V6 · PROBE-TO-WATER GAP</p>
+        <div class="metric-value"><span id="probe-gap">--</span><small>cm</small></div>
+        <p>Distance measured under the cover.</p>
+      </article>
+      <article class="metric-card glass-panel">
+        <p class="eyebrow">V0 · DEVICE HEARTBEAT</p>
+        <div class="heartbeat-row"><span id="heart-pulse" class="heart-pulse"></span><b id="heartbeat-status">Waiting for ESP32</b></div>
+        <p>Connection status through Blynk.</p>
+      </article>
+    </section>
+
+    <section class="dashboard-grid">
+      <article class="glass-panel water-card">
+        <div class="panel-heading"><div><p class="eyebrow">V2 · INTERNAL MANHOLE WATER DEPTH</p><h2>Live water level</h2></div><span class="unit-chip">CENTIMETRES</span></div>
+        <div class="water-content">
+          <div class="gauge-shell"><svg viewBox="0 0 240 145" aria-label="Water depth gauge"><path class="gauge-track" d="M30 120 A90 90 0 0 1 210 120"/><path id="gauge-fill" class="gauge-fill" d="M30 120 A90 90 0 0 1 30 120"/><text id="depth-value" x="120" y="98" text-anchor="middle">--</text><text x="120" y="119" text-anchor="middle" class="gauge-unit">cm</text></svg></div>
+          <div class="water-insight"><h3 id="depth-headline">Waiting for sensor data</h3><p id="depth-explain">The probe measures the internal air gap. The controller converts it into internal water depth using the configured chamber reference height.</p><div class="threshold-row"><span><b>CAUTION</b> configured level</span><span><b>HIGH RISK</b> configured level</span></div></div>
+        </div>
+      </article>
+      <article class="glass-panel trend-card">
+        <div class="panel-heading"><div><p class="eyebrow">TIME SERIES</p><h2>Internal water trend</h2></div><span class="stream-chip">LIVE STREAM</span></div>
+        <svg id="trend-chart" class="trend-chart" viewBox="0 0 660 280" preserveAspectRatio="none" aria-label="Internal water level chart"></svg>
+        <div class="chart-caption"><span>Oldest available reading</span><span>Most recent reading</span></div>
+      </article>
+    </section>
+
+    <section class="lower-grid">
+      <article class="glass-panel system-card">
+        <div class="panel-heading"><div><p class="eyebrow">SYSTEM ARCHITECTURE</p><h2>Signal and safety flow</h2></div></div>
+        <div class="system-flow">
+          <div class="flow-node power"><b>5 V</b><small>Power bank</small></div><div class="flow-arrow">→</div><div class="flow-node core"><b>ESP32</b><small>local decision</small></div><div class="flow-arrow">→</div><div class="flow-node cloud"><b>Blynk</b><small>cloud status</small></div>
+          <div class="system-subrow"><div class="flow-node sensor"><b>Sensors</b><small>reed · tilt · float · AJ-SR04M</small></div><div class="flow-node alert"><b>Local alert</b><small>LED · buzzer</small></div></div>
+        </div>
+      </article>
+      <article class="glass-panel events-card">
+        <div class="panel-heading"><div><p class="eyebrow">EVENT TIMELINE</p><h2>Latest safety events</h2></div></div>
+        <div id="event-list" class="event-list"><div class="empty-state">No events received yet.</div></div>
+      </article>
+    </section>
+
+    <section class="control-panel glass-panel">
+      <div><p class="eyebrow">PROTECTED CONTROL</p><h2>Maintenance reset</h2><p>The website can request Blynk V10. The ESP32 is still the authority and rejects reset while the cover remains unsafe.</p></div>
+      <button id="open-reset-modal" class="primary-button">Maintenance reset <span>→</span></button>
+    </section>
+  </main>
+
+  <div id="reset-modal" class="modal-backdrop" aria-hidden="true">
+    <section class="reset-modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+      <button id="close-reset-modal" class="modal-close" aria-label="Close">×</button>
+      <p class="eyebrow">PROTECTED ACTION</p><h2 id="modal-title">Request maintenance reset</h2>
+      <p>Confirm the cover has been physically restored and is not tilted. The ESP32 will perform a final safety check.</p>
+      <label class="check-line"><input id="cover-confirm" type="checkbox"> <span>I confirm the cover is seated and safe.</span></label>
+      <label class="key-label">Control key<input id="control-key" type="password" placeholder="Enter server control key" autocomplete="off"></label>
+      <p id="reset-feedback" class="reset-feedback"></p>
+      <button id="submit-reset" class="primary-button" disabled>Send V10 reset request <span>→</span></button>
+    </section>
+  </div>
+
+  <template id="event-template"><div class="event-item"><span class="event-marker"></span><div class="event-content"><b class="event-code"></b><p class="event-message"></p></div><time></time></div></template>
+  <script src="/app.js"></script>
+</body>
+</html>

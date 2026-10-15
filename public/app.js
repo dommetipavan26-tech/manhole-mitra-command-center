@@ -59,7 +59,7 @@ function render(next) {
   $('live-dot').className=`live-dot ${online?'live':'alert'}`;
   $('connection-label').textContent=online?'DEVICE ONLINE':'WAITING FOR DEVICE';
   $('last-updated').textContent=formatTime(next.lastUpdated);
-  $('source-badge').textContent=next.source==='live'?'LIVE BLYNK DATA':next.source==='demo'?'DEMO PREVIEW':'WAITING FOR BLYNK';
+  $('source-badge').textContent=next.source==='live' ? (online ? 'LIVE BLYNK DATA' : 'LAST BLYNK STATE') : next.source==='demo' ? 'DEMO PREVIEW' : 'WAITING FOR BLYNK';
   const cover=Number(next.coverStatus||0), risk=Number(next.internalRisk||0);
   setStatus('cover-card','cover-status','cover-desc',next.coverLabel||coverLabels[cover]||'UNKNOWN',coverDescriptions[cover]||'',cover);
   setStatus('risk-card','risk-status','risk-desc',next.riskLabel||riskLabels[risk]||'UNKNOWN',riskDescriptions[risk]||'',risk);

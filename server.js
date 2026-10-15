@@ -146,15 +146,29 @@ function applyEvent(payload, query) {
 async function pollBlynk() {
   if (!POLL_BLYNK || !BLYNK_DEVICE_TOKEN) return;
   try {
+    // Blynk stores the last virtual-pin values even after hardware disconnects.
+    // Query actual connection state separately so the custom website never treats stale V0=1 as live hardware.
+    const connectionEndpoint = `${BLYNK_SERVER}/external/api/isHardwareConnected?token=${encodeURIComponent(BLYNK_DEVICE_TOKEN)}`;
+    const connectionResponse = await fetch(connectionEndpoint);
+    if (!connectionResponse.ok) throw new Error(`connection check: Blynk returned HTTP ${connectionResponse.status}`);
+    const connectionText = (await connectionResponse.text()).trim().replace(/^\"|\"$/g, '');
+    const actualHardwareOnline = connectionText === 'true';
+
     for (const pin of ['V0', 'V1', 'V2', 'V5', 'V6']) {
       const endpoint = `${BLYNK_SERVER}/external/api/get?token=${encodeURIComponent(BLYNK_DEVICE_TOKEN)}&${pin}`;
       const response = await fetch(endpoint);
       if (!response.ok) throw new Error(`${pin}: Blynk returned HTTP ${response.status}`);
       const raw = (await response.text()).trim();
       let value = raw;
-      try { const parsed = JSON.parse(raw); value = Array.isArray(parsed) ? parsed[0] : parsed; } catch (_) { /* plain numeric response */ }
+      try { const parsed = JSON.parse(raw); value = Array.isArray(parsed) ? parsed[0] : parsed; } catch (_) { /* Blynk may return a plain numeric value. */ }
       applyPin(pin, value, 'live', nowISO());
     }
+
+    // Override cached V0 status with Blynk's real hardware lifecycle value.
+    state.online = actualHardwareOnline;
+    state.source = 'live';
+    state.lastUpdated = nowISO();
+    broadcastState();
   } catch (error) {
     console.error(`[Blynk polling] ${error.message}`);
   }

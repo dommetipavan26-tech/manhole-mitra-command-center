@@ -1,0 +1,87 @@
+MM
+  
+ESP32
+IoT
+INTERNAL WATER-LEVEL & COVER SAFETY
+
+Manhole-Mitra Command Center
+A custom monitoring interface for the ESP32 safety node.
+
+CONNECTINGWaiting for telemetry
+◇
+MONITORED NODEMM 001 College Main Gate
+UNDER-COVER PROBELOCAL SAFETY LOGICLIVE BLYNK DATA
+DEMO PREVIEW
+PROJECT SUMMARY
+
+One node. Two protective functions.
+Manhole-Mitra detects a missing or tilted cover, then monitors the water level inside the manhole chamber. Local LED/buzzer output is immediate; Blynk provides the remote event and status layer.
+
+Reed + TiltAJ-SR04M + FloatESP32 + Blynk
+MEASUREMENT MODEL
+
+Internal water depth = probe-to-base height − probe-to-water gap
+Internal water level is an early hydraulic-risk indicator. Reed and tilt sensors remain the direct confirmation of cover displacement.
+
+V1 · COVER STATUS
+COVER OK
+Reed and tilt inputs are safe.
+
+V5 · INTERNAL WATER RISK
+NORMAL
+Internal chamber condition is stable.
+
+V6 · PROBE-TO-WATER GAP
+
+--cm
+Distance measured under the cover.
+
+V0 · DEVICE HEARTBEAT
+
+Waiting for ESP32
+Connection status through Blynk.
+
+V2 · INTERNAL MANHOLE WATER DEPTH
+
+Live water level
+CENTIMETRES
+--
+cm
+Waiting for sensor data
+The probe measures the internal air gap. The controller converts it into internal water depth using the configured chamber reference height.
+
+CAUTION configured levelHIGH RISK configured level
+TIME SERIES
+
+Internal water trend
+LIVE STREAM
+Oldest available readingMost recent reading
+SYSTEM ARCHITECTURE
+
+Signal and safety flow
+5 VPower bank
+→
+ESP32local decision
+→
+Blynkcloud status
+Sensorsreed · tilt · float · AJ-SR04M
+Local alertLED · buzzer
+EVENT TIMELINE
+
+Latest safety events
+No events received yet.
+PROTECTED CONTROL
+
+Maintenance reset
+The website can request Blynk V10. The ESP32 is still the authority and rejects reset while the cover remains unsafe.
+
+Maintenance reset →
+×
+PROTECTED ACTION
+
+Request maintenance reset
+Confirm the cover has been physically restored and is not tilted. The ESP32 will perform a final safety check.
+
+ I confirm the cover is seated and safe. Control key
+Enter server control key
+Send V10 reset request →

@@ -118,6 +118,14 @@ function applyPin(pinRaw, valueRaw, source = 'live', timestamp = nowISO()) {
   } else if (pin === 'V6' || pin === '6') {
     const value = safeNumber(valueRaw, 0, 1000);
     if (value !== null) { state.probeGap = value; changed = true; }
+  } else if (pin === 'V8' || pin === '8') {
+    // Dedicated raw integer cover state from ESP32; avoids Blynk Enum-label mapping differences.
+    const value = safeNumber(valueRaw, 0, 3);
+    if (value !== null) { state.coverStatus = value; changed = true; }
+  } else if (pin === 'V9' || pin === '9') {
+    // Dedicated raw integer water-risk state from ESP32; avoids Blynk Enum-label mapping differences.
+    const value = safeNumber(valueRaw, 0, 3);
+    if (value !== null) { state.internalRisk = value; changed = true; }
   }
   if (changed) markLive(source, timestamp);
   return changed;
@@ -154,7 +162,9 @@ async function pollBlynk() {
     const connectionText = (await connectionResponse.text()).trim().replace(/^\"|\"$/g, '');
     const actualHardwareOnline = connectionText === 'true';
 
-    for (const pin of ['V0', 'V1', 'V2', 'V5', 'V6']) {
+    // V8/V9 are raw Integer bridge streams specifically created for this website.
+    // Do not use V1/V5 here because Blynk Enum labels can differ from their raw API representation.
+    for (const pin of ['V0', 'V2', 'V6', 'V8', 'V9']) {
       const endpoint = `${BLYNK_SERVER}/external/api/get?token=${encodeURIComponent(BLYNK_DEVICE_TOKEN)}&${pin}`;
       const response = await fetch(endpoint);
       if (!response.ok) throw new Error(`${pin}: Blynk returned HTTP ${response.status}`);

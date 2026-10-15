@@ -70,7 +70,7 @@ Then open the main Render URL in a browser. You should see **DEMO PREVIEW** mode
 
 ## 4. Connect Blynk webhooks
 
-In Blynk Console, create webhooks for virtual pins V0, V1, V2, V5 and V6.
+In Blynk Console, create webhooks for virtual pins V0, V2, V6, V8 and V9. V8/V9 are raw Integer bridge streams used by the custom website.
 
 Use:
 

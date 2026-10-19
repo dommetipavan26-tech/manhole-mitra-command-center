@@ -1,5 +1,7 @@
 # GitHub + Render Deployment Guide
 
+> **Templates, not broken links:** URLs containing `YOUR-USERNAME` and `YOUR-RENDER-SITE` are placeholders — replace them with your actual GitHub username and Render URL.
+
 ## 1. Prepare a GitHub repository
 
 Create a new GitHub repository, for example:
@@ -15,7 +17,7 @@ git init
 git add .
 git commit -m "Initial Manhole-Mitra command center"
 git branch -M main
-git remote add origin https://github.com/YOUR-USERNAME/manhole-mitra-command-center.git
+git remote add origin https://github.com/YOUR-USERNAME/manhole-mitra-command-center.git  # ← replace YOUR-USERNAME
 git push -u origin main
 ```
 
@@ -49,12 +51,12 @@ DEMO_MODE = true
 7. Copy the resulting Render URL, for example:
 
 ```text
-https://manhole-mitra-command-center.onrender.com
+https://manhole-mitra-command-center.onrender.com  # example — yours will differ
 ```
 
 ## 3. Verify deployment
 
-Open:
+Open (replace `YOUR-RENDER-SITE` with your Render hostname):
 
 ```text
 https://YOUR-RENDER-SITE.onrender.com/health
@@ -72,7 +74,7 @@ Then open the main Render URL in a browser. You should see **DEMO PREVIEW** mode
 
 In Blynk Console, create webhooks for virtual pins V0, V2, V6, V8 and V9. V8/V9 are raw Integer bridge streams used by the custom website.
 
-Use:
+Use (replace `YOUR-RENDER-SITE`):
 
 ```text
 POST https://YOUR-RENDER-SITE.onrender.com/api/blynk/webhook
@@ -95,7 +97,7 @@ Use JSON payload:
 }
 ```
 
-For Blynk events use:
+For Blynk events use (replace `YOUR-RENDER-SITE`):
 
 ```text
 POST https://YOUR-RENDER-SITE.onrender.com/api/blynk/event

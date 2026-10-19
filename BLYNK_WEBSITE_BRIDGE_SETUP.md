@@ -58,7 +58,7 @@ No Blynk widget is required for V9.
 
 ## 3. Upload the updated ESP32 firmware
 
-Use the newest `ManholeMitra_PowerBank.ino` file. It now writes:
+Use the newest `ManholeMitra_PowerBank.ino` file (ESP32 firmware — maintained outside this web-dashboard repo). It now writes:
 
 ```cpp
 Blynk.virtualWrite(V8, coverState);

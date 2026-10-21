@@ -35,7 +35,12 @@ const BLYNK_SERVER = (process.env.BLYNK_SERVER || 'https://blr1.blynk.cloud').re
 const BLYNK_DEVICE_TOKEN = process.env.BLYNK_DEVICE_TOKEN || '';
 const POLL_BLYNK = String(process.env.POLL_BLYNK || 'false').toLowerCase() === 'true';
 const POLL_INTERVAL_MS = Math.max(1000, Number(process.env.POLL_INTERVAL_MS || 1000));
-const DEMO_MODE = String(process.env.DEMO_MODE || 'true').toLowerCase() === 'true';
+function envFlag(name, defaultValue) {
+  const raw = process.env[name];
+  if (raw === undefined || String(raw).trim() === '') return defaultValue;
+  return ['1', 'true', 'yes', 'on'].includes(String(raw).trim().toLowerCase());
+}
+const DEMO_MODE = envFlag('DEMO_MODE', false);
 
 const sseClients = new Set();
 const coverLabels = ['COVER OK', 'COVER MISSING', 'COVER TILTED', 'RESET REQUIRED'];

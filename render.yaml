@@ -18,8 +18,8 @@ services:
       - key: BLYNK_DEVICE_TOKEN
         sync: false
       - key: POLL_BLYNK
-        value: false
-      - key: POLL_INTERVAL_MS
-        value: "5000"
-      - key: DEMO_MODE
         value: true
+      - key: POLL_INTERVAL_MS
+        value: "1000"
+      - key: DEMO_MODE
+        value: false

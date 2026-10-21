@@ -34,7 +34,7 @@ const CONTROL_KEY = process.env.CONTROL_KEY || '';
 const BLYNK_SERVER = (process.env.BLYNK_SERVER || 'https://blr1.blynk.cloud').replace(/\/$/, '');
 const BLYNK_DEVICE_TOKEN = process.env.BLYNK_DEVICE_TOKEN || '';
 const POLL_BLYNK = String(process.env.POLL_BLYNK || 'false').toLowerCase() === 'true';
-const POLL_INTERVAL_MS = Math.max(2000, Number(process.env.POLL_INTERVAL_MS || 5000));
+const POLL_INTERVAL_MS = Math.max(1000, Number(process.env.POLL_INTERVAL_MS || 1000));
 const DEMO_MODE = String(process.env.DEMO_MODE || 'true').toLowerCase() === 'true';
 
 const sseClients = new Set();
@@ -100,7 +100,7 @@ function markLive(source = 'live', timestamp = nowISO()) {
   broadcastState();
 }
 
-function applyPin(pinRaw, valueRaw, source = 'live', timestamp = nowISO()) {
+function applyPin(pinRaw, valueRaw, source = 'live', timestamp = nowISO(), silent = false) {
   const pin = String(pinRaw || '').trim().toUpperCase();
   let changed = false;
   if (pin === 'V0' || pin === '0') {
@@ -111,7 +111,12 @@ function applyPin(pinRaw, valueRaw, source = 'live', timestamp = nowISO()) {
     if (value !== null) { state.coverStatus = value; changed = true; }
   } else if (pin === 'V2' || pin === '2') {
     const value = safeNumber(valueRaw, 0, 1000);
-    if (value !== null) { state.internalDepth = value; addHistory(value, timestamp); changed = true; }
+    if (value !== null) {
+      const prev = state.internalDepth;
+      state.internalDepth = value;
+      if (state.history.length === 0 || Math.abs(value - prev) >= 0.05) addHistory(value, timestamp);
+      changed = true;
+    }
   } else if (pin === 'V5' || pin === '5') {
     const value = safeNumber(valueRaw, 0, 3);
     if (value !== null) { state.internalRisk = value; changed = true; }
@@ -127,7 +132,7 @@ function applyPin(pinRaw, valueRaw, source = 'live', timestamp = nowISO()) {
     const value = safeNumber(valueRaw, 0, 3);
     if (value !== null) { state.internalRisk = value; changed = true; }
   }
-  if (changed) markLive(source, timestamp);
+  if (changed && !silent) markLive(source, timestamp);
   return changed;
 }
 function applyWebhook(payload, query) {
@@ -139,7 +144,7 @@ function applyWebhook(payload, query) {
 
   let updated = false;
   for (const [key, value] of Object.entries(payload)) {
-    if (/^V(0|1|2|5|6)$/i.test(key)) updated = applyPin(key, value, 'live', timestamp) || updated;
+    if (/^V(0|1|2|5|6|8|9)$/i.test(key)) updated = applyPin(key, value, 'live', timestamp) || updated;
   }
   return updated;
 }
@@ -151,36 +156,60 @@ function applyEvent(payload, query) {
   markLive('live');
 }
 
+let pollInFlight = false;
 async function pollBlynk() {
-  if (!POLL_BLYNK || !BLYNK_DEVICE_TOKEN) return;
+  if (!POLL_BLYNK || !BLYNK_DEVICE_TOKEN || pollInFlight) return;
+  pollInFlight = true;
   try {
     // Blynk stores the last virtual-pin values even after hardware disconnects.
     // Query actual connection state separately so the custom website never treats stale V0=1 as live hardware.
-    const connectionEndpoint = `${BLYNK_SERVER}/external/api/isHardwareConnected?token=${encodeURIComponent(BLYNK_DEVICE_TOKEN)}`;
-    const connectionResponse = await fetch(connectionEndpoint);
+    // One multi-pin GET (instead of 5 sequential GETs) plus a parallel connection check.
+    const token = encodeURIComponent(BLYNK_DEVICE_TOKEN);
+    const pins = ['V0', 'V2', 'V6', 'V8', 'V9'];
+    const connectionEndpoint = `${BLYNK_SERVER}/external/api/isHardwareConnected?token=${token}`;
+    const valuesEndpoint = `${BLYNK_SERVER}/external/api/get?token=${token}&${pins.join('&')}`;
+    const timestamp = nowISO();
+
+    const [connectionResponse, valuesResponse] = await Promise.all([
+      fetch(connectionEndpoint),
+      fetch(valuesEndpoint)
+    ]);
     if (!connectionResponse.ok) throw new Error(`connection check: Blynk returned HTTP ${connectionResponse.status}`);
-    const connectionText = (await connectionResponse.text()).trim().replace(/^\"|\"$/g, '');
+    if (!valuesResponse.ok) throw new Error(`datastreams: Blynk returned HTTP ${valuesResponse.status}`);
+
+    const connectionText = (await connectionResponse.text()).trim().replace(/^["']|["']$/g, '');
     const actualHardwareOnline = connectionText === 'true';
 
-    // V8/V9 are raw Integer bridge streams specifically created for this website.
-    // Do not use V1/V5 here because Blynk Enum labels can differ from their raw API representation.
-    for (const pin of ['V0', 'V2', 'V6', 'V8', 'V9']) {
-      const endpoint = `${BLYNK_SERVER}/external/api/get?token=${encodeURIComponent(BLYNK_DEVICE_TOKEN)}&${pin}`;
-      const response = await fetch(endpoint);
-      if (!response.ok) throw new Error(`${pin}: Blynk returned HTTP ${response.status}`);
-      const raw = (await response.text()).trim();
-      let value = raw;
-      try { const parsed = JSON.parse(raw); value = Array.isArray(parsed) ? parsed[0] : parsed; } catch (_) { /* Blynk may return a plain numeric value. */ }
-      applyPin(pin, value, 'live', nowISO());
+    const raw = (await valuesResponse.text()).trim();
+    let parsed = raw;
+    try { parsed = JSON.parse(raw); } catch (_) { /* Blynk may return a plain numeric value. */ }
+
+    const pick = (obj, pin) => {
+      if (obj == null || typeof obj !== 'object') return undefined;
+      if (Object.prototype.hasOwnProperty.call(obj, pin)) return obj[pin];
+      const lower = pin.toLowerCase();
+      if (Object.prototype.hasOwnProperty.call(obj, lower)) return obj[lower];
+      return undefined;
+    };
+
+    if (Array.isArray(parsed)) {
+      parsed.forEach((value, i) => { if (pins[i]) applyPin(pins[i], value, 'live', timestamp, true); });
+    } else if (parsed && typeof parsed === 'object') {
+      for (const pin of pins) {
+        const value = pick(parsed, pin);
+        if (value !== undefined) applyPin(pin, value, 'live', timestamp, true);
+      }
     }
 
     // Override cached V0 status with Blynk's real hardware lifecycle value.
     state.online = actualHardwareOnline;
     state.source = 'live';
-    state.lastUpdated = nowISO();
+    state.lastUpdated = timestamp;
     broadcastState();
   } catch (error) {
     console.error(`[Blynk polling] ${error.message}`);
+  } finally {
+    pollInFlight = false;
   }
 }
 
@@ -268,6 +297,25 @@ const server = http.createServer(async (req, res) => {
       return sendJson(res, 200, { ok: true, updated });
     } catch (error) { return sendJson(res, 400, { error: error.message }); }
   }
+  if (method === 'POST' && url.pathname === '/api/device/push') {
+    if (!webhookAuthorized(url, req)) return sendJson(res, 401, { error: 'Invalid webhook secret.' });
+    try {
+      const payload = await readBody(req);
+      const timestamp = nowISO();
+      if (payload.device_name) state.deviceName = String(payload.device_name);
+      let updated = false;
+      for (const pin of ['V0', 'V2', 'V6', 'V8', 'V9']) {
+        const value = payload[pin] ?? payload[pin.toLowerCase()];
+        if (value !== undefined) updated = applyPin(pin, value, 'live', timestamp, true) || updated;
+      }
+      if (payload.online === true) state.online = true;
+      if (updated || payload.V0 === 1 || payload.v0 === 1) {
+        state.online = true;
+        markLive('live', timestamp);
+      }
+      return sendJson(res, 200, { ok: true, updated });
+    } catch (error) { return sendJson(res, 400, { error: error.message }); }
+  }
   if (method === 'POST' && url.pathname === '/api/blynk/event') {
     if (!webhookAuthorized(url, req)) return sendJson(res, 401, { error: 'Invalid webhook secret.' });
     try { applyEvent(await readBody(req), Object.fromEntries(url.searchParams)); return sendJson(res, 200, { ok: true }); }
@@ -297,6 +345,7 @@ setInterval(() => writeSse('ping', { timestamp: nowISO() }), 25_000);
 server.listen(PORT, () => {
   console.log(`Manhole-Mitra Command Center running on http://0.0.0.0:${PORT}`);
   console.log(`Webhook endpoint: /api/blynk/webhook (secret via X-Manhole-Secret header)`);
+  console.log(`Device push endpoint: /api/device/push (ESP32 instant telemetry)`);
   if (POLL_BLYNK && BLYNK_DEVICE_TOKEN) {
     console.log(`Blynk polling fallback enabled every ${POLL_INTERVAL_MS} ms`);
     pollBlynk();

@@ -42,9 +42,9 @@ WEBHOOK_SECRET = long random string you choose
 CONTROL_KEY = separate dashboard reset password
 BLYNK_SERVER = https://blr1.blynk.cloud
 BLYNK_DEVICE_TOKEN = your Blynk device token
-POLL_BLYNK = false
-POLL_INTERVAL_MS = 5000
-DEMO_MODE = true
+POLL_BLYNK = true
+POLL_INTERVAL_MS = 1000
+DEMO_MODE = false
 ```
 
 6. Click **Apply** / **Create Web Service**.
@@ -68,7 +68,7 @@ Expected JSON:
 {"ok":true,"service":"manhole-mitra-command-center"}
 ```
 
-Then open the main Render URL in a browser. You should see **DEMO PREVIEW** mode.
+Then open the main Render URL in a browser. You should see **LIVE BLYNK DATA** once the ESP32 is online.
 
 ## 4. Connect Blynk webhooks
 
@@ -114,7 +114,16 @@ POLL_BLYNK=true
 BLYNK_DEVICE_TOKEN=your actual device token
 ```
 
-Then redeploy. The dashboard will poll Blynk every 5 seconds.
+Then redeploy. The dashboard will poll Blynk every 1 second as a fallback.
+
+For **instant** updates, flash firmware v3.12 after setting:
+
+```text
+WEBSITE_HOST        = your-service.onrender.com     (no https://)
+WEBSITE_PUSH_SECRET = the same value as WEBHOOK_SECRET
+```
+
+The ESP32 POSTs to `/api/device/push` on a background task so cover/flood appear on the site in a few hundred milliseconds. Keep `WEBHOOK_SECRET` set on Render or those POSTs return 401.
 
 ## 6. Before presenting
 

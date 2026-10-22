@@ -105,6 +105,37 @@ function markLive(source = 'live', timestamp = nowISO()) {
   broadcastState();
 }
 
+let lastDevicePushAt = 0;
+const DEVICE_PUSH_PRIORITY_MS = 15000;
+const riskPending = { value: null, count: 0 };
+function applyRiskDebounced(value) {
+  const current = state.internalRisk;
+  if (value === current) {
+    riskPending.value = null;
+    riskPending.count = 0;
+    return false;
+  }
+  // Escalate immediately (NORMAL/CAUTION -> HIGH INTERNAL WATER).
+  if (value > current) {
+    state.internalRisk = value;
+    riskPending.value = null;
+    riskPending.count = 0;
+    return true;
+  }
+  // Drop only after 3 matching lower readings so poll/jitter cannot flash NORMAL.
+  if (riskPending.value !== value) {
+    riskPending.value = value;
+    riskPending.count = 1;
+    return false;
+  }
+  riskPending.count += 1;
+  if (riskPending.count < 3) return false;
+  state.internalRisk = value;
+  riskPending.value = null;
+  riskPending.count = 0;
+  return true;
+}
+
 function applyPin(pinRaw, valueRaw, source = 'live', timestamp = nowISO(), silent = false) {
   const pin = String(pinRaw || '').trim().toUpperCase();
   let changed = false;
@@ -135,7 +166,7 @@ function applyPin(pinRaw, valueRaw, source = 'live', timestamp = nowISO(), silen
   } else if (pin === 'V9' || pin === '9') {
     // Dedicated raw integer water-risk state from ESP32; avoids Blynk Enum-label mapping differences.
     const value = safeNumber(valueRaw, 0, 3);
-    if (value !== null) { state.internalRisk = value; changed = true; }
+    if (value !== null) changed = applyRiskDebounced(value);
   }
   if (changed && !silent) markLive(source, timestamp);
   return changed;
@@ -145,7 +176,11 @@ function applyWebhook(payload, query) {
   const pin = payload.pin || payload.vPin || payload.vpin || payload.device_pin || query.pin || query.vPin;
   const value = payload.value ?? payload.pinValue ?? payload.device_pinValue ?? query.value;
   const timestamp = payload.timestamp || payload.timestamp_iso8601 || nowISO();
-  if (pin !== undefined && value !== undefined) return applyPin(pin, value, 'live', timestamp);
+  if (pin !== undefined && value !== undefined) {
+    const pinName = String(pin).trim().toUpperCase();
+    if (pinName === 'V8' || pinName === 'V9' || pinName === '8' || pinName === '9') lastDevicePushAt = Date.now();
+    return applyPin(pin, value, 'live', timestamp);
+  }
 
   let updated = false;
   for (const [key, value] of Object.entries(payload)) {
@@ -170,39 +205,43 @@ async function pollBlynk() {
     // Query actual connection state separately so the custom website never treats stale V0=1 as live hardware.
     // One multi-pin GET (instead of 5 sequential GETs) plus a parallel connection check.
     const token = encodeURIComponent(BLYNK_DEVICE_TOKEN);
-    const pins = ['V0', 'V2', 'V6', 'V8', 'V9'];
+    // ESP32 /api/device/push is the source of truth for V2/V6/V8/V9.
+    // Polling those pins from Blynk made the site flicker between the real
+    // sensor value and a stale/wrong Blynk value (e.g. 23 cm ↔ 16.8 cm).
+    const devicePushFresh = (Date.now() - lastDevicePushAt) < DEVICE_PUSH_PRIORITY_MS;
+    const pins = devicePushFresh ? [] : ['V0', 'V2', 'V6', 'V8', 'V9'];
     const connectionEndpoint = `${BLYNK_SERVER}/external/api/isHardwareConnected?token=${token}`;
-    const valuesEndpoint = `${BLYNK_SERVER}/external/api/get?token=${token}&${pins.join('&')}`;
     const timestamp = nowISO();
 
-    const [connectionResponse, valuesResponse] = await Promise.all([
-      fetch(connectionEndpoint),
-      fetch(valuesEndpoint)
-    ]);
+    const connectionResponse = await fetch(connectionEndpoint);
     if (!connectionResponse.ok) throw new Error(`connection check: Blynk returned HTTP ${connectionResponse.status}`);
-    if (!valuesResponse.ok) throw new Error(`datastreams: Blynk returned HTTP ${valuesResponse.status}`);
-
     const connectionText = (await connectionResponse.text()).trim().replace(/^["']|["']$/g, '');
     const actualHardwareOnline = connectionText === 'true';
 
-    const raw = (await valuesResponse.text()).trim();
-    let parsed = raw;
-    try { parsed = JSON.parse(raw); } catch (_) { /* Blynk may return a plain numeric value. */ }
+    if (pins.length) {
+      const valuesEndpoint = `${BLYNK_SERVER}/external/api/get?token=${token}&${pins.join('&')}`;
+      const valuesResponse = await fetch(valuesEndpoint);
+      if (!valuesResponse.ok) throw new Error(`datastreams: Blynk returned HTTP ${valuesResponse.status}`);
 
-    const pick = (obj, pin) => {
-      if (obj == null || typeof obj !== 'object') return undefined;
-      if (Object.prototype.hasOwnProperty.call(obj, pin)) return obj[pin];
-      const lower = pin.toLowerCase();
-      if (Object.prototype.hasOwnProperty.call(obj, lower)) return obj[lower];
-      return undefined;
-    };
+      const raw = (await valuesResponse.text()).trim();
+      let parsed = raw;
+      try { parsed = JSON.parse(raw); } catch (_) { /* Blynk may return a plain numeric value. */ }
 
-    if (Array.isArray(parsed)) {
-      parsed.forEach((value, i) => { if (pins[i]) applyPin(pins[i], value, 'live', timestamp, true); });
-    } else if (parsed && typeof parsed === 'object') {
-      for (const pin of pins) {
-        const value = pick(parsed, pin);
-        if (value !== undefined) applyPin(pin, value, 'live', timestamp, true);
+      const pick = (obj, pin) => {
+        if (obj == null || typeof obj !== 'object') return undefined;
+        if (Object.prototype.hasOwnProperty.call(obj, pin)) return obj[pin];
+        const lower = pin.toLowerCase();
+        if (Object.prototype.hasOwnProperty.call(obj, lower)) return obj[lower];
+        return undefined;
+      };
+
+      if (Array.isArray(parsed)) {
+        parsed.forEach((value, i) => { if (pins[i]) applyPin(pins[i], value, 'live', timestamp, true); });
+      } else if (parsed && typeof parsed === 'object') {
+        for (const pin of pins) {
+          const value = pick(parsed, pin);
+          if (value !== undefined) applyPin(pin, value, 'live', timestamp, true);
+        }
       }
     }
 
@@ -307,6 +346,7 @@ const server = http.createServer(async (req, res) => {
     try {
       const payload = await readBody(req);
       const timestamp = nowISO();
+      lastDevicePushAt = Date.now();
       if (payload.device_name) state.deviceName = String(payload.device_name);
       let updated = false;
       for (const pin of ['V0', 'V2', 'V6', 'V8', 'V9']) {
